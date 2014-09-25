@@ -1,1 +1,5 @@
 *.swp
+__pycache__*
+*.pyo
+test.py
+
