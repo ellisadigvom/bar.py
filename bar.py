@@ -137,7 +137,7 @@ class Bar():
     def format(self, text, background=None, foreground=None, underline=False, overline=False,
             underline_color=None, invert=False):
         for i in (background, foreground, underline_color):
-            i = self.bar.color_validate(i)
+            i = self.color_validate(i)
 
         if foreground:
             text = '%{{F{0}}}{1}%{{F-}}'.format(foreground, text)
@@ -150,5 +150,6 @@ class Bar():
         if underline_color:
             pass
         if invert:
-            pass
+            text = '%{{R}}{}%{{R}}'.format(text)
+            
         return text

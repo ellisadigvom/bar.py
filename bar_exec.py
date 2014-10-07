@@ -16,5 +16,8 @@ if __name__ == '__main__':
         f.write('\n')
         f.write(str(bar.get_pid()))
 
-    clockwidget = widgets.ClockWidget(icon='È', bar=bar, position='left')
-    while 1: time.sleep(30)
+    clockwidget = widgets.ClockWidget(icon='È', bar=bar, position='right')
+    workspacewidget = widgets.BSPWMWorkspaceWidget(labels=[i for i in'archlinux'],
+            bar=bar, position='left')
+    while 1:
+        time.sleep(30)

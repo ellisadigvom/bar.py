@@ -1,5 +1,5 @@
 from time import strftime, sleep
-from subprocess import getoutput
+from subprocess import getoutput, Popen, PIPE
 from mpd import MPDClient, ConnectionError
 import re
 from itertools import zip_longest
@@ -7,11 +7,14 @@ import threading
 
 #TODO: Clean up init methods
 class Widget(threading.Thread):
-    def __init__(self, bar=None, position='center', icon=None):
-        if not bar: raise ValueError
+    def __init__(self, bar, position='center', icon=None):
+        if not bar:
+            raise ValueError
         self._bar = bar
+        self._icon = icon
         self.text = ''
         bar.register(self, position=position)
+        self._format_icon()
         super().__init__()
         self.start()
 
@@ -21,19 +24,27 @@ class Widget(threading.Thread):
 
     def _iconify(self):
         if self._icon:
-            self.text = '{}{}{}'.format(self._icon,  self._bar.resources['icon_separator'],
-                    self.text)
+            self.text = '{}{}{}'.format(self._icon,
+                self._bar.resources['icon_separator'], self.text)
+
+class SkeletonWidget(Widget):
+    def __init__(self, **kwargs):
+        # Do init stuff here
+        super().__init__(**kwargs)
+
+    def run(self):
+        pass
 
 class StaticTextWidget():
     def __init__(self, text):
         self._text = text
 
+#TODO: What happens when we put the computer to sleep?
 class ClockWidget(Widget):
     def __init__(self, format='%a %d %b %H:%M', icon='È', **kwargs):
-        self._icon = icon
         self._format = format
         self.text = 'this should not happen'
-        super().__init__(**kwargs)
+        super().__init__(icon=icon, **kwargs)
 
     def run(self):
         first_run = True
@@ -48,6 +59,41 @@ class ClockWidget(Widget):
             else:
                 sleep(60)
 
+#TODO: Implement the clicky widget
+# a.k.a the button widget
+class ClickyWidget(Widget):
+    def __init__(self):
+        pass
+
+class BSPWMWorkspaceWidget(Widget):
+    def __init__(self, labels=[], **kwargs):
+        self._labels = labels
+        super().__init__(**kwargs)
+
+    def run(self):
+        bspc_subscribe = Popen (['bspc', 'control', '--subscribe'],
+                stdout=PIPE, stderr=PIPE, universal_newlines=True)
+        while 1:
+            text = ''
+            line = bspc_subscribe.stdout.readline()
+            workspaces = line.split(':')[1:-1]
+            for workspace, label in zip_longest(workspaces, self._labels):
+                active = False
+                occupied = False
+                if re.match('[A-Z]', workspace):    # TODO: regexps are probably overkill
+                    active = True
+                if re.match('[o, O]', workspace):
+                    occupied = True
+
+                if label:
+                    workspace_text = ' {} '.format(label)
+                else:
+                    workspace_text = ' {} '.format(workspace[1:])
+                if active:
+                    workspace_text = self._bar.format(workspace_text, invert=True)
+                text += workspace_text
+            self.text = text
+            self._bar.redraw()
 
 #class BatteryWidget(Widget):
     #def __init__(self, show_value=70, **kwargs):
@@ -127,32 +173,4 @@ class ClockWidget(Widget):
         #ret_dict['text'] = text
         #return ret_dict
 
-#class WorkspaceWidget(Widget):
-    #def __init__(self, workspace_labels=[], active_background=None, active_foreground=None,
-            #workspace_separator=' ', **kwargs):
-        #super().__init__(**kwargs)
-        #self._active_background = color_validate(active_background)
-        #self._active_foreground = color_validate(active_foreground)
-        #self._workspace_separator = workspace_separator
-        #workspaces = getoutput('bspc query -D').splitlines()
-        #workspaces = [i.strip() for i in workspaces]
-        #self._workspaces = workspaces
-        #self._labels = workspace_labels
-
-    #def __call__(self):
-        #ret_dict = super().__call__()
-        #active_workspace = getoutput('bspc query -D -d').strip()
-        #text = ''
-        #for workspace, label in zip_longest(self._workspaces, self._labels,
-                #fillvalue=None):
-            #if not workspace: break
-            #this_workspace = label or workspace 
-            #if workspace == active_workspace:
-                #if self._active_background:
-                    #this_workspace = colorize(text=this_workspace, background = self._active_background)
-                #if self._active_foreground:
-                    #this_workspace = colorize(text=this_workspace, foreground = self._active_foreground)
-            #text = self._workspace_separator.join((text, this_workspace))
-        #ret_dict['text'] = text
-        #return ret_dict
 
