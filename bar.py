@@ -2,11 +2,14 @@
 # Author: Ellis Adigvom ellisadigvom@gmail.com
 from subprocess import PIPE, Popen, getoutput
 import re
+#TODO: The rest of the clicky stuff
 
 class Bar():
+    _wildcard_resources = ['background', 'foreground']
     def __init__(self, separator='   ', padding=' ', icon_separator=' '):
         self._widgets = {'left': [], 'center': [], 'right': []}
-
+        self._clicky_callbacks = {}
+        
         xresources = self._get_xresources()
         self.resources = xresources
 
@@ -15,7 +18,7 @@ class Bar():
         self.resources['padding'] = padding
         self._colors = {}
 
-        self._bar = self.start()
+        self._bar_process = self.start()
 
     def start(self):
         ''' Start the bar process
@@ -45,28 +48,38 @@ class Bar():
             args.append('-u')
             args.append(underline_height)
 
-        bar = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE,
+        bar_process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE,
                 universal_newlines=True)
-        if bar.poll():
-            error = self._bar.stderr.read().strip()
+        if bar_process.poll():
+            error = bar_process.stderr.read().strip()
             raise ValueError(error)
-        return bar
+        return bar_process
 
     def register(self, widget, position):
         self._widgets[position].append(widget)
 
     def get_pid(self):
-        if self._bar:
-            return self._bar.pid
+        if self._bar_process:
+            return self._bar_process.pid
 
-    #TODO: Do the wildcards thing
-    def _get_xresources(self, wildcardresources=[]):
+    #TODO: Get colors and store them with sensible names
+    #TODO: Decide whether to use the two regexps or one monster one
+    def _get_xresources(self):
         ''' Get data from panel.* xresources entries,
             or wildcard entries we want
         '''
         data = getoutput('xrdb -query')
         xresources = {}
         for i in data.splitlines():
+            # Wildcard resources
+            match = re.match('\*\.(\w+):\s+(.+)', i)
+            if match:
+                key = match.group(1)
+                value = match.group(2)
+                if match.group(1) in self._wildcard_resources:
+                    xresources[key] = value
+                    
+            # Resources starting with 'panel'
             match = re.match('^panel\.(.+):\s+(.+)', i)
             #match = re.match('^panel\.(.+):\s+[\' "]?(.+)[\' "]?', i)
             if match:
@@ -76,12 +89,15 @@ class Bar():
                 if match:
                     value = match.group(1)
                 xresources[key] = value
+        print(xresources)
         return xresources
 
     def _print_line(self, line):
-        self._bar.stdin.write(line)
-        self._bar.stdin.write('\n')
-        self._bar.stdin.flush()
+        """ Write a line of text to the bar. That is all.
+        """
+        self._bar_process.stdin.write(line)
+        self._bar_process.stdin.write('\n')
+        self._bar_process.stdin.flush()
 
     def redraw(self):
         ''' Print widgets to the appropriate positions on the bar
@@ -126,7 +142,8 @@ class Bar():
 
         match = re.search('([a-f \d]{6}$)|([a-f \d]{8}$)', color)
         if not match:
-            raise ValueError('Invalid color: ' + color)
+            return None
+            #raise ValueError('Invalid color: ' + color)
         raw_color = match.group(0)
         if len(raw_color) == 8:
             return ''.join(('#', raw_color))
@@ -134,21 +151,30 @@ class Bar():
             return ''.join(('#', 'ff', raw_color))
 
     #TODO: The rest of the formatting options
-    def format(self, text, background=None, foreground=None, underline=False, overline=False,
-            underline_color=None, invert=False):
-        for i in (background, foreground, underline_color):
+    def format(self, text, background=None, foreground=None, underline=False,
+            overline=False, line_color=None, invert=False):
+        """ Format text according to the options given using bar's syntax
+        """
+        for i in (background, foreground, line_color):
             i = self.color_validate(i)
 
         if foreground:
             text = '%{{F{0}}}{1}%{{F-}}'.format(foreground, text)
         if background:
             text = '%{{B{0}}}{1}%{{B-}}'.format(background, text)
-        if underline:
-            pass
-        if overline:
-            pass
-        if underline_color:
-            pass
+        if underline or overline:
+            if underline:
+                text = '%{{+u}}{}%{{-u}}'.format(text)
+            if overline:
+                text = '%{{+o}}{}%{{-o}}'.format(text)
+            if not line_color:
+                if 'line_color' in self.resources.keys():
+                    line_color = self.resources['line_color']
+                elif 'foreground' in self.resources.keys():
+                    line_color = self.resources['foreground']
+
+            text = '%{{U{0}}}{1}%{{U-}}'.format(line_color, text)
+
         if invert:
             text = '%{{R}}{}%{{R}}'.format(text)
             
