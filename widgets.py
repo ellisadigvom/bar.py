@@ -5,6 +5,7 @@ from itertools import zip_longest
 import threading
 import shlex
 
+
 #TODO: Clean up init methods
 class Widget(threading.Thread):
     def __init__(self, bar, position='center', icon=None):
@@ -32,41 +33,62 @@ class Widget(threading.Thread):
     def _update_icon(self, icon):
         pass
 
+    def format(self, text, **kwargs):
+        return self._bar.format(text, **kwargs)
+
     def iconify(self):
         if self._icon:
             self.text = '{}{}{}'.format(self._icon,
                 self._bar.resources['icon_separator'], self.text)
+
+    def make_clickable(self, text, args, button=''):
+        return self._bar.make_clickable(text, args, self, button)
+
+
+    def click_handler(self, args):
+        """ Handle click events
+        """
+        pass
+
 
 class SkeletonWidget(Widget):
     def __init__(self, icon=None, **kwargs):
         # Do init stuff here
         super().__init__(icon=icon, **kwargs)
 
+    def click_handler(self, args):
+        """ Handle click events
+        """
+        pass
+
     def run(self):
         text = 'Stuff you want to display'
         self.update(text)
+
 
 class StaticTextWidget():
     def __init__(self, text):
         self._text = text
 
+
 class ClockWidget(Widget):
-    def __init__(self, format='%a %d %b %H:%M', icon='È', **kwargs):
-        self._format = format
+    def __init__(self, format_string='%a %d %b %H:%M', icon='È', **kwargs):
+        self._format_string = format_string
         super().__init__(icon=icon, **kwargs)
 
     def run(self):
         while 1:
-            print('clock')
-            self.update(strftime(self._format))
+            self.update(strftime(self._format_string))
             seconds = int(strftime('%S'))
             sleep(60 - seconds)
+
 
 #TODO: Implement the clicky widget
 # a.k.a the button widget
 class ClickyWidget(Widget):
     def __init__(self):
         pass
+
 
 class BSPWMWorkspaceWidget(Widget):
     def __init__(self, labels=[], **kwargs):
@@ -77,7 +99,6 @@ class BSPWMWorkspaceWidget(Widget):
         bspc_subscribe = subprocess.Popen (['bspc', 'control', '--subscribe'],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         while 1:
-            print('workspace')
             text = ''
             line = bspc_subscribe.stdout.readline()
             workspaces = line.split(':')[1:-1]
@@ -95,13 +116,19 @@ class BSPWMWorkspaceWidget(Widget):
                 else:
                     workspace_text = ' {} '.format(workspace[1:])
                 if active:
-                    workspace_text = self._bar.format(workspace_text, invert=True)
+                    workspace_text = self.format(workspace_text, invert=True)
                 if occupied:
-                    workspace_text = self._bar.format(workspace_text, underline=True)
+                    workspace_text = self.format(workspace_text, underline=True)
+                workspace_text = self.make_clickable(workspace_text, 'switch-to {}'.format(workspace[1:]) )
                 text += workspace_text
 
             self.update(text)
 
+    def click_handler(self, arguments):
+        subprocess.call(['bspc', 'desktop', '-f', arguments[1]])
+
+
+#TODO: Bad things happen when mpd is not running
 class MpdWidget(Widget):
     def __init__(self, icon='ê', host='localhost', port='6600', **kwargs):
         self._host=host
@@ -145,7 +172,6 @@ class MpdWidget(Widget):
 
     def run(self):
         while 1:
-            print('mpd')
             time_to_next_update = None
             data = self._get_data()
             if data['playing']:
@@ -154,7 +180,7 @@ class MpdWidget(Widget):
                 # Drawing the underline progress bar
                 text_length = len(text)
                 position = int(text_length * (data['position'] / data['length']))
-                text = self._bar.format(text[:position], underline=True) \
+                text = self.format(text[:position], underline=True) \
                     + text[position:]
             
                 time_to_next_update = float(data['length'] / text_length)
@@ -169,6 +195,7 @@ class MpdWidget(Widget):
             except subprocess.TimeoutExpired:
                 process.kill()
 
+
 class BatteryWidget(Widget):
     def __init__(self, icon='ó', hide_value=80, **kwargs):
         self._hide_value = hide_value
@@ -181,7 +208,6 @@ class BatteryWidget(Widget):
         return int(charge_percentage)
 
     def run(self):
-        print('bat')
         while 1:
             percentage = self._get_percentage()
             if percentage > self._hide_value:
@@ -190,13 +216,13 @@ class BatteryWidget(Widget):
                 self.update(str(percentage))
             sleep(30)
 
+
 class WiFiWidget(Widget):
     def __init__(self, icon='¤', adapter='wlp2s0', **kwargs):
         self._adapter = adapter
         super().__init__(icon=icon, **kwargs)
 
     def _get_essid(self):
-        print('wifi')
         data = subprocess.getoutput('iwconfig ' + self._adapter)
         match = re.search('ESSID:"(.*)"', data)
         if match:
@@ -212,3 +238,34 @@ class WiFiWidget(Widget):
             else:
                 self.update(essid)
             sleep(5)
+
+
+class TaskbarWidget(Widget):
+    def __init__(self, icon=None, **kwargs):
+        super().__init__(icon=icon, **kwargs)
+
+    def click_handler(self, args):
+        """ Handle click events
+        """
+        subprocess.getoutput('bspc window -f {}'.format(args[0]))
+
+    def run(self):
+        bspc_subscribe = subprocess.Popen (['bspc', 'control', '--subscribe'],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        while 1:
+            windows = subprocess.getoutput('bspc query -W -d focused').splitlines()
+            data = subprocess.getoutput('bspc query --tree').splitlines()
+            data = [i.strip() for i in data]
+            text = ''
+            for line in data:
+                for window in windows:
+                    if re.search(window, line):
+                        match = re.match('\s*. (\S+) .+?(\*)?$', line)
+                        window_name = ' {} '.format(match.group(1))
+                        if match.group(2):
+                            window_name = self.format(window_name, invert=True)
+                        window_name = self.make_clickable(window_name, window)
+                        text += window_name
+            self.update(text)
+            #bspc_subscribe.stdout.readline()
+            sleep(1)

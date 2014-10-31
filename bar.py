@@ -2,13 +2,13 @@
 # Author: Ellis Adigvom ellisadigvom@gmail.com
 from subprocess import PIPE, Popen, getoutput
 import re
+import threading
 #TODO: The rest of the clicky stuff
 
 class Bar():
     _wildcard_resources = ['background', 'foreground']
     def __init__(self, separator='   ', padding=' ', icon_separator=' '):
         self._widgets = {'left': [], 'center': [], 'right': []}
-        self._clicky_callbacks = {}
         
         xresources = self._get_xresources()
         self.resources = xresources
@@ -19,6 +19,8 @@ class Bar():
         self._colors = {}
 
         self._bar_process = self.start()
+        self._listen_thread = threading.Thread(target=self.click_listener)
+        self._listen_thread.start()
 
     def start(self):
         ''' Start the bar process
@@ -55,6 +57,18 @@ class Bar():
             raise ValueError(error)
         return bar_process
 
+    def click_listener(self):
+        while 1:
+            line = self._bar_process.stdout.readline().strip()
+            prefix = line.split()[0]
+            arguments = line.split()[1:]
+            widgets = []
+            [widgets.extend(i) for i in self._widgets.values()]
+            for i in widgets:
+                if int(prefix) == i.__hash__():
+                    i.click_handler(arguments)
+                    break
+
     def register(self, widget, position):
         self._widgets[position].append(widget)
 
@@ -89,7 +103,6 @@ class Bar():
                 if match:
                     value = match.group(1)
                 xresources[key] = value
-        print(xresources)
         return xresources
 
     def _print_line(self, line):
@@ -169,13 +182,16 @@ class Bar():
                 text = '%{{+o}}{}%{{-o}}'.format(text)
             if not line_color:
                 if 'line_color' in self.resources.keys():
-                    line_color = self.resources['line_color']
+                    line_color = self.color_validate('line_color')
                 elif 'foreground' in self.resources.keys():
-                    line_color = self.resources['foreground']
-
+                    line_color = self.color_validate('foreground')
             text = '%{{U{0}}}{1}%{{U-}}'.format(line_color, text)
 
         if invert:
             text = '%{{R}}{}%{{R}}'.format(text)
-            
+        return text
+
+    def make_clickable(self, text, args, widget, button=''):
+        hash = widget.__hash__()
+        text =  '%{{A{}:{} {}:}}{}%{{A}}'.format(button, hash, args, text)
         return text

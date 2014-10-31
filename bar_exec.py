@@ -20,6 +20,7 @@ if __name__ == '__main__':
     wifiwidget = widgets.WiFiWidget(bar=bar, position='right')
     batterywidget = widgets.BatteryWidget(bar=bar, position='right')
     clockwidget = widgets.ClockWidget(bar=bar, position='right')
+    #taskbarwidget = widgets.TaskbarWidget(bar=bar, position='center')
 
     workspacewidget = widgets.BSPWMWorkspaceWidget(labels=[i for i in'archlinux'],
             bar=bar, position='left')
