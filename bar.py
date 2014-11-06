@@ -192,6 +192,6 @@ class Bar():
         return text
 
     def make_clickable(self, text, args, widget, button=''):
-        hash = widget.__hash__()
-        text =  '%{{A{}:{} {}:}}{}%{{A}}'.format(button, hash, args, text)
+        widget_hash = widget.__hash__()
+        text = '%{{A{}:{} {}:}}{}%{{A}}'.format(button, widget_hash, args, text)
         return text

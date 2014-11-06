@@ -239,7 +239,7 @@ class WiFiWidget(Widget):
                 self.update(essid)
             sleep(5)
 
-
+#TODO: This
 class TaskbarWidget(Widget):
     def __init__(self, icon=None, **kwargs):
         super().__init__(icon=icon, **kwargs)
