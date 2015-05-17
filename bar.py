@@ -6,17 +6,16 @@ import threading
 #TODO: The rest of the clicky stuff
 
 class Bar():
-    _wildcard_resources = ['background', 'foreground']
-    def __init__(self, separator='   ', padding=' ', icon_separator=' '):
+    def __init__(self, separator='  |  ', padding=' ', icon_separator=' '):
         self._widgets = {'left': [], 'center': [], 'right': []}
-        
-        xresources = self._get_xresources()
-        self.resources = xresources
 
-        self.resources['separator'] = separator
-        self.resources['icon_separator'] = icon_separator
-        self.resources['padding'] = padding
-        self._colors = {}
+        self.separator = separator
+        self.icon_separator = icon_separator
+        self.padding = padding
+        self.font = None
+        self.position = 'top'
+
+        self._colors = get_xresources()
 
         self._bar_process = self.start()
         self._listen_thread = threading.Thread(target=self.click_listener)
@@ -25,30 +24,24 @@ class Bar():
     def start(self):
         ''' Start the bar process
         '''
-        args = ['bar']
-
-        background = self.color_validate('background')
+        args = ['lemonbar']
+        
+        background = self.color('background')
         if background:
             args.append('-B')
             args.append(background)
 
-        foreground = self.color_validate('foreground')
+        foreground = self.color('foreground')
         if foreground:
             args.append('-F')
             args.append(foreground)
 
-        font = self.resources.get('font')
-        if font:
+        if self.font:
             args.append('-f')
-            args.append(font)
+            args.append(self.font)
 
-        if self.resources.get('position') == 'bottom':
+        if self.position == 'bottom':
             args.append('-b')
-
-        underline_height = self.resources.get('underline.height')
-        if underline_height:
-            args.append('-u')
-            args.append(underline_height)
 
         bar_process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE,
                 universal_newlines=True)
@@ -76,35 +69,6 @@ class Bar():
         if self._bar_process:
             return self._bar_process.pid
 
-    #TODO: Get colors and store them with sensible names
-    #TODO: Decide whether to use the two regexps or one monster one
-    def _get_xresources(self):
-        ''' Get data from panel.* xresources entries,
-            or wildcard entries we want
-        '''
-        data = getoutput('xrdb -query')
-        xresources = {}
-        for i in data.splitlines():
-            # Wildcard resources
-            match = re.match('\*\.(\w+):\s+(.+)', i)
-            if match:
-                key = match.group(1)
-                value = match.group(2)
-                if match.group(1) in self._wildcard_resources:
-                    xresources[key] = value
-                    
-            # Resources starting with 'panel'
-            match = re.match('^panel\.(.+):\s+(.+)', i)
-            #match = re.match('^panel\.(.+):\s+[\' "]?(.+)[\' "]?', i)
-            if match:
-                key = match.group(1)
-                value = match.group(2)
-                match = re.match('^[\' "](.*)[\' "]$', value)
-                if match:
-                    value = match.group(1)
-                xresources[key] = value
-        return xresources
-
     def _print_line(self, line):
         """ Write a line of text to the bar. That is all.
         """
@@ -112,33 +76,43 @@ class Bar():
         self._bar_process.stdin.write('\n')
         self._bar_process.stdin.flush()
 
+    TODO: Modify this so separators are also colored
     def redraw(self):
         ''' Print widgets to the appropriate positions on the bar
         '''
         if self._widgets['left'] == []:
             left_string = ''
         else:
-            left_string = self.resources['separator'].join(
-                    [i.text for i in self._widgets['left'] if i.text])
+            left_string = self.separator.join(
+                    [self.format(i.text, background=i.background,
+                                 foreground=i.foreground)
+                     for i
+                     in self._widgets['left'] if i.text])
 
         if self._widgets['center'] == []:
             center_string = ''
         else:
-            center_string = self.resources['separator'].join(
-                    [i.text for i in self._widgets['center'] if i.text])
+            center_string = self.separator.join(
+                    [self.format(i.text, background=i.background,
+                                 foreground=i.foreground)
+                     for i
+                     in self._widgets['center'] if i.text])
 
         if self._widgets['right'] == []:
             right_string = ''
         else:
-            right_string = self.resources['separator'].join(
-                    [i.text for i in self._widgets['right'] if i.text])
+            right_string = self.separator.join(
+                    [self.format(i.text, background=i.background,
+                                 foreground=i.foreground)
+                     for i
+                     in self._widgets['right'] if i.text])
 
-        line = ''.join(('%{l}', self.resources['padding'], left_string,
+        line = ''.join(('%{l}', self.padding, left_string,
                         '%{c}', center_string,
-                        '%{r}', right_string, self.resources['padding']))
+                        '%{r}', right_string, self.padding))
         self._print_line(line)
 
-    def color_validate(self, color, skipresources=False):
+    def color(self, color, skipresources=False):
         ''' Takes anything that looks like it might be a color
             and changes it to the form #aarrggbb
         '''
@@ -148,7 +122,7 @@ class Bar():
         if color in self._colors:
             return self._colors[color]
         elif color in self.resources.keys() and not skipresources:
-            color_value = self.color_validate(self.resources[color],
+            color_value = self.color(self.resources[color],
                     skipresources=True)
             self._colors[color] = color_value
             return color_value
@@ -168,8 +142,11 @@ class Bar():
             overline=False, line_color=None, invert=False):
         """ Format text according to the options given using bar's syntax
         """
+        foreground = self.color(foreground)
+        background = self.color(background)
+        line_color = self.color(line_color)
         for i in (background, foreground, line_color):
-            i = self.color_validate(i)
+            i = self.color(i)
 
         if foreground:
             text = '%{{F{0}}}{1}%{{F-}}'.format(foreground, text)
@@ -180,11 +157,11 @@ class Bar():
                 text = '%{{+u}}{}%{{-u}}'.format(text)
             if overline:
                 text = '%{{+o}}{}%{{-o}}'.format(text)
-            if not line_color:
-                if 'line_color' in self.resources.keys():
-                    line_color = self.color_validate('line_color')
-                elif 'foreground' in self.resources.keys():
-                    line_color = self.color_validate('foreground')
+            #if not line_color:
+                #if 'line_color' in self.resources.keys():
+                    #line_color = self.color('line_color')
+                #elif 'foreground' in self.resources.keys():
+                    #line_color = self.color('foreground')
             text = '%{{U{0}}}{1}%{{U-}}'.format(line_color, text)
 
         if invert:
@@ -195,3 +172,31 @@ class Bar():
         widget_hash = widget.__hash__()
         text = '%{{A{}:{} {}:}}{}%{{A}}'.format(button, widget_hash, args, text)
         return text
+
+
+def get_xresources():
+    data = getoutput('xrdb -query')
+    xresources = {}
+    colors = ['black', 'dark_red', 'dark_green', 'dark_yellow',
+                'dark_blue', 'dark_magenta', 'dark_cyan', 'light_grey',
+                'dark_grey', 'red', 'green', 'yellow', 'blue',
+                'magenta', 'cyan', 'white']
+    for i in data.splitlines():
+        # Color definitions
+        match = re.match('\*\.?(\w+):\s+(.+)', i)
+        if match:
+            key = match.group(1)
+            value = match.group(2)
+            if re.match('^color\d+', key):
+                xresources[key] = value
+            if key in ['background', 'foreground']:
+                xresources[key] = value
+
+    def parse_key(key):
+        m = re.match('color(\d+)', key)
+        if m:
+            return colors[int(m.group(1))]
+        else:
+            return key
+                
+    return {parse_key(k): v for (k, v) in xresources.items()}

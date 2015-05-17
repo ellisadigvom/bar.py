@@ -1,3 +1,5 @@
+# coding: utf-8
+
 from time import strftime, sleep
 import subprocess
 import re
@@ -18,6 +20,8 @@ class Widget(threading.Thread):
         self.format_icon()
         super().__init__()
         self.start()
+        self.background = 'background'
+        self.foreground = 'foreground'
 
     def update(self, text):
         self.text = text
@@ -91,7 +95,8 @@ class ClickyWidget(Widget):
 
 
 class BSPWMWorkspaceWidget(Widget):
-    def __init__(self, labels=[], **kwargs):
+    def __init__(self, labels=None, **kwargs):
+        if not labels: labels = []
         self._labels = labels
         super().__init__(**kwargs)
 
@@ -172,28 +177,33 @@ class MpdWidget(Widget):
 
     def run(self):
         while 1:
-            time_to_next_update = None
-            data = self._get_data()
-            if data['playing']:
-                text = '{} - {}'.format(data['title'], data['artist'])
-
-                # Drawing the underline progress bar
-                text_length = len(text)
-                position = int(text_length * (data['position'] / data['length']))
-                text = self.format(text[:position], underline=True) \
-                    + text[position:]
-            
-                time_to_next_update = float(data['length'] / text_length)
-                self.update(text)
-            else:
-                self.update(None)
-
-            process = subprocess.Popen(shlex.split('mpc -h {} -p {} idle player'
-                .format(self._host, self._port)))#, stdout=subprocess.PIPE)
+            # Dirty fix for when mpd is not running
             try:
-                process.wait(time_to_next_update)
-            except subprocess.TimeoutExpired:
-                process.kill()
+                time_to_next_update = None
+                data = self._get_data()
+                if data['playing']:
+                    text = '{} - {}'.format(data['title'], data['artist'])
+
+                    # Drawing the underline progress bar
+                    text_length = len(text)
+                    position = int(text_length * (data['position'] / data['length']))
+                    text = self.format(text[:position], underline=True) \
+                        + text[position:]
+
+                    time_to_next_update = float(data['length'] / text_length)
+                    self.update(text)
+                else:
+                    self.update(None)
+
+                process = subprocess.Popen(shlex.split('mpc -h {} -p {} idle player'
+                                                       .format(self._host, self._port)))
+                try:
+                    process.wait(time_to_next_update)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+            except: # Bite me
+                sleep(2)
+
 
 
 class BatteryWidget(Widget):
@@ -202,8 +212,8 @@ class BatteryWidget(Widget):
         super().__init__(icon=icon, **kwargs)
 
     def _get_percentage(self):
-        charge_full = int(open('/sys/class/power_supply/BAT1/charge_full').read())
-        charge_now = int(open('/sys/class/power_supply/BAT1/charge_now').read())
+        charge_full = int(open('/sys/class/power_supply/BAT0/charge_full').read())
+        charge_now = int(open('/sys/class/power_supply/BAT0/charge_now').read())
         charge_percentage = (charge_now / charge_full) * 100
         return int(charge_percentage)
 
@@ -218,9 +228,11 @@ class BatteryWidget(Widget):
 
 
 class WiFiWidget(Widget):
-    def __init__(self, icon='¤', adapter='wlp2s0', **kwargs):
+    def __init__(self, icon='¤', adapter='wlp7s0', **kwargs):
         self._adapter = adapter
         super().__init__(icon=icon, **kwargs)
+        self.background = 'dark_green'
+        self.foreground = 'white'
 
     def _get_essid(self):
         data = subprocess.getoutput('iwconfig ' + self._adapter)
@@ -232,11 +244,28 @@ class WiFiWidget(Widget):
 
     def run(self):
         while 1:
+            text = ''
             essid = self._get_essid()
-            if not essid:
-                self.update('')
-            else:
-                self.update(essid)
+            if essid:
+                text = essid
+
+            data = subprocess.getoutput('ip addr').splitlines()
+            interface_data = {}
+            current_interface = ''
+            for line in data:
+                match = re.match('\d: (.+):', line)
+                if match:
+                    current_interface = match.group(1)
+                    interface_data[current_interface] = [line]
+                else:
+                    interface_data[current_interface].append(line)
+            for line in interface_data[self._adapter]:
+                match = re.match('\s+inet (\d+\.\d+.\d+.\d+)', line)
+                if match:
+                    ip = match.group(1)
+                    text = '{} {}'.format(text, ip)
+                    break
+            self.update(text) # FIXME: That thing with the ip staying around after disconnection
             sleep(5)
 
 #TODO: This
@@ -250,7 +279,7 @@ class TaskbarWidget(Widget):
         subprocess.getoutput('bspc window -f {}'.format(args[0]))
 
     def run(self):
-        bspc_subscribe = subprocess.Popen (['bspc', 'control', '--subscribe'],
+        bspc_subscribe = subprocess.Popen(['bspc', 'control', '--subscribe'],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         while 1:
             windows = subprocess.getoutput('bspc query -W -d focused').splitlines()
@@ -267,5 +296,52 @@ class TaskbarWidget(Widget):
                         window_name = self.make_clickable(window_name, window)
                         text += window_name
             self.update(text)
-            #bspc_subscribe.stdout.readline()
+            #bspc_subscribe.stdout.readline() # FIXME: Something wicked going on here
             sleep(1)
+
+class IPAddrWidget(Widget):
+    def __init__(self, icon=None, interface='wlp2s0', **kwargs):
+        self._interface = interface
+        super().__init__(icon=icon, **kwargs)
+
+    def click_handler(self, args):
+        """ Handle click events
+        """
+        pass
+
+    def run(self):
+        while 1:
+            data = subprocess.getoutput('ip addr').splitlines()
+            interface_data = {}
+            current_interface = ''
+            for line in data:
+                match = re.match('\d: (.+):', line)
+                if match:
+                    current_interface = match.group(1)
+                    interface_data[current_interface] = [line]
+                else:
+                    interface_data[current_interface].append(line)
+            for line in interface_data[self._interface]:
+                match = re.match('\s+inet (\d+\.\d+.\d+.\d+)', line)
+                if match:
+                    ip = match.group(1)
+                    self.update(ip)
+                    break
+                else:
+                    self.update('')
+            sleep(10)
+
+class TitleWidget(Widget):
+    def __init__(self, icon=None, **kwargs):
+        # Do init stuff here
+        super().__init__(icon=icon, **kwargs)
+
+    def click_handler(self, args):
+        """ Handle click events
+        """
+        pass
+
+    def run(self):
+        xtitle = subprocess.Popen(['xtitle', '-s'], stdout=subprocess.PIPE, universal_newlines=True)
+        while 1:
+            self.update(xtitle.stdout.readline().strip())
