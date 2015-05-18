@@ -40,7 +40,7 @@ if __name__ == '__main__':
     # taskbarwidget = widgets.TaskbarWidget(bar=bar, position='center', icon=None)
     # titlewidget = widgets.TitleWidget(bar=bar, position='left')
 
-    workspacewidget = widgets.BSPWMWorkspaceWidget(labels=[i for i in '¹archlinux'],
+    workspacewidget = widgets.BSPWMWorkspaceWidget(labels=[i for i in '¹rchlinux'],
             bar=bar, position='left')
     workspacewidget.background = 'dark_blue'
     # workspacewidget.foreground = 'white'

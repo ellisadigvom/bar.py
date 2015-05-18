@@ -6,6 +6,7 @@ import re
 from itertools import zip_longest
 import threading
 import shlex
+from os import path
 
 
 # TODO: Clean up init methods
@@ -147,7 +148,7 @@ class MpdWidget(Widget):
         artist = None
         playing = False
         mpc_output = subprocess.getoutput('mpc status --format {} -h {} -p {}'.format(
-            '%title%---%artist%', self._host, self._port))
+            '%title%---%artist%---%file%', self._host, self._port))
         lines = mpc_output.splitlines()
 
         # Is it stopped?
@@ -155,10 +156,11 @@ class MpdWidget(Widget):
             return {'title': '', 'artist': '', 'playing': False, 'pos': 0}
 
         # Title and artist
-        match = re.match('^(.*)---(.*)$', lines[0])
+        match = re.match('^(.*)---(.*)---(.*)$', lines[0])
         if match:
             title = match.group(1)
             artist = match.group(2)
+            filename = match.group(3)
 
         # Playing or paused
         match = re.match('\[(.+)\]', lines[1])
@@ -175,7 +177,7 @@ class MpdWidget(Widget):
         length = (len_min * 60) + len_sec
 
         return {'title': title, 'artist': artist, 'playing': playing,
-                'position': position, 'length': length}
+                'position': position, 'length': length, 'filename': filename}
 
     def run(self):
         while 1:
@@ -184,7 +186,10 @@ class MpdWidget(Widget):
                 time_to_next_update = None
                 data = self._get_data()
                 if data['playing']:
-                    text = '{} - {}'.format(data['title'], data['artist'])
+                    if not (data['title']):
+                        text = '{}'.format('.'.join(path.basename(data['filename']).split('.')[:-1]))
+                    else:
+                        text = '{} - {}'.format(data['title'], data['artist'])
 
                     # Drawing the underline progress bar
                     text_length = len(text)
