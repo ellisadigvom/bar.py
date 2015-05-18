@@ -3,35 +3,42 @@
 from subprocess import PIPE, Popen, getoutput
 import re
 import threading
-#TODO: The rest of the clicky stuff
+# TODO: The rest of the clicky stuff
+
 
 class Bar():
-    def __init__(self, separator='  |  ', padding=' ', icon_separator=' '):
+    def __init__(self):
         self._widgets = {'left': [], 'center': [], 'right': []}
 
-        self.separator = separator
-        self.icon_separator = icon_separator
-        self.padding = padding
+        self.background = 'background'
+        self.foreground = 'foreground'
+
+        self.height = ''
+        self.width = ''
+        self.xoffset = ''
+        self.yoffset = ''
+
+        self.separator = ''
+        self.padding = ' '
+        self.icon_separator = ' '
         self.font = None
         self.position = 'top'
 
-        self._colors = get_xresources()
-
-        self._bar_process = self.start()
-        self._listen_thread = threading.Thread(target=self.click_listener)
-        self._listen_thread.start()
+        self._colors = {}
+        self._colors = {k: self.color(v) for (k, v)
+                        in get_xresources().items()}
 
     def start(self):
         ''' Start the bar process
         '''
         args = ['lemonbar']
-        
-        background = self.color('background')
+
+        background = self.color(self.background)
         if background:
             args.append('-B')
             args.append(background)
 
-        foreground = self.color('foreground')
+        foreground = self.color(self.foreground)
         if foreground:
             args.append('-F')
             args.append(foreground)
@@ -43,12 +50,22 @@ class Bar():
         if self.position == 'bottom':
             args.append('-b')
 
+        if self.height or self.width or self.xoffset or self.yoffset:
+            args.append('-g')
+            args.append('{}x{}+{}+{}'.format(self.width,
+                                             self.height,
+                                             self.xoffset,
+                                             self.yoffset))
+
         bar_process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE,
-                universal_newlines=True)
+                            universal_newlines=True)
         if bar_process.poll():
             error = bar_process.stderr.read().strip()
             raise ValueError(error)
-        return bar_process
+
+        self._bar_process = bar_process
+        self._listen_thread = threading.Thread(target=self.click_listener)
+        self._listen_thread.start()
 
     def click_listener(self):
         while 1:
@@ -76,7 +93,7 @@ class Bar():
         self._bar_process.stdin.write('\n')
         self._bar_process.stdin.flush()
 
-    TODO: Modify this so separators are also colored
+    # TODO: Modify this so separators are also colored
     def redraw(self):
         ''' Print widgets to the appropriate positions on the bar
         '''
@@ -84,62 +101,60 @@ class Bar():
             left_string = ''
         else:
             left_string = self.separator.join(
-                    [self.format(i.text, background=i.background,
-                                 foreground=i.foreground)
-                     for i
-                     in self._widgets['left'] if i.text])
+                [self.draw_widget(i) for i in self._widgets['left'] if i.text])
 
         if self._widgets['center'] == []:
             center_string = ''
         else:
             center_string = self.separator.join(
-                    [self.format(i.text, background=i.background,
-                                 foreground=i.foreground)
-                     for i
-                     in self._widgets['center'] if i.text])
+                [self.draw_widget(i) for i in self._widgets['center'] if i.text])
 
         if self._widgets['right'] == []:
             right_string = ''
         else:
             right_string = self.separator.join(
-                    [self.format(i.text, background=i.background,
-                                 foreground=i.foreground)
-                     for i
-                     in self._widgets['right'] if i.text])
+                [self.draw_widget(i) for i in self._widgets['right'] if i.text])
 
-        line = ''.join(('%{l}', self.padding, left_string,
+        line = ''.join(('%{l}', left_string,
                         '%{c}', center_string,
-                        '%{r}', right_string, self.padding))
+                        '%{r}', right_string))
         self._print_line(line)
 
-    def color(self, color, skipresources=False):
+    def draw_widget(self, widget):
+        s = "{}{}{}".format(self.padding, widget.text, self.padding)
+        return self.format(s, widget.background, widget.foreground,
+                           line_color=widget.line_color)
+
+    def color(self, color, skip_defaults=False):
         ''' Takes anything that looks like it might be a color
             and changes it to the form #aarrggbb
         '''
         if not color:
             return None
 
+        if not skip_defaults:
+            if color == 'background':
+                return self.color(self.background, skip_defaults=True)
+            elif color == 'foreground':
+                return self.color(self.foreground, skip_defaults=True)
+
+        # Check color dictionary
         if color in self._colors:
             return self._colors[color]
-        elif color in self.resources.keys() and not skipresources:
-            color_value = self.color(self.resources[color],
-                    skipresources=True)
-            self._colors[color] = color_value
-            return color_value
 
         match = re.search('([a-f \d]{6}$)|([a-f \d]{8}$)', color)
         if not match:
             return None
-            #raise ValueError('Invalid color: ' + color)
+            # raise ValueError('Invalid color: ' + color)
         raw_color = match.group(0)
         if len(raw_color) == 8:
             return ''.join(('#', raw_color))
         elif len(raw_color) == 6:
             return ''.join(('#', 'ff', raw_color))
 
-    #TODO: The rest of the formatting options
+    # TODO: The rest of the formatting options
     def format(self, text, background=None, foreground=None, underline=False,
-            overline=False, line_color=None, invert=False):
+               overline=False, line_color=None, invert=False):
         """ Format text according to the options given using bar's syntax
         """
         foreground = self.color(foreground)
@@ -157,12 +172,8 @@ class Bar():
                 text = '%{{+u}}{}%{{-u}}'.format(text)
             if overline:
                 text = '%{{+o}}{}%{{-o}}'.format(text)
-            #if not line_color:
-                #if 'line_color' in self.resources.keys():
-                    #line_color = self.color('line_color')
-                #elif 'foreground' in self.resources.keys():
-                    #line_color = self.color('foreground')
-            text = '%{{U{0}}}{1}%{{U-}}'.format(line_color, text)
+            if line_color:
+                text = '%{{U{0}}}{1}%{{U-}}'.format(line_color, text)
 
         if invert:
             text = '%{{R}}{}%{{R}}'.format(text)
@@ -178,9 +189,9 @@ def get_xresources():
     data = getoutput('xrdb -query')
     xresources = {}
     colors = ['black', 'dark_red', 'dark_green', 'dark_yellow',
-                'dark_blue', 'dark_magenta', 'dark_cyan', 'light_grey',
-                'dark_grey', 'red', 'green', 'yellow', 'blue',
-                'magenta', 'cyan', 'white']
+              'dark_blue', 'dark_magenta', 'dark_cyan', 'light_grey',
+              'dark_grey', 'red', 'green', 'yellow', 'blue',
+              'magenta', 'cyan', 'white']
     for i in data.splitlines():
         # Color definitions
         match = re.match('\*\.?(\w+):\s+(.+)', i)
@@ -198,5 +209,5 @@ def get_xresources():
             return colors[int(m.group(1))]
         else:
             return key
-                
+
     return {parse_key(k): v for (k, v) in xresources.items()}

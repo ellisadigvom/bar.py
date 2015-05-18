@@ -8,20 +8,22 @@ import threading
 import shlex
 
 
-#TODO: Clean up init methods
+# TODO: Clean up init methods
+# FIXME: Widgets start to execute as soon as they are created. They shouldn't
 class Widget(threading.Thread):
     def __init__(self, bar, position='center', icon=None):
         if not bar:
             raise ValueError
         self._bar = bar
         self._icon = icon
+        self.background = 'background'
+        self.foreground = 'foreground'
+        self.line_color = self.foreground
         self.text = ''
         bar.register(self, position=position)
         self.format_icon()
         super().__init__()
         self.start()
-        self.background = 'background'
-        self.foreground = 'foreground'
 
     def update(self, text):
         self.text = text
@@ -136,8 +138,8 @@ class BSPWMWorkspaceWidget(Widget):
 #TODO: Bad things happen when mpd is not running
 class MpdWidget(Widget):
     def __init__(self, icon='ê', host='localhost', port='6600', **kwargs):
-        self._host=host
-        self._port=port
+        self._host = host
+        self._port = port
         super().__init__(icon=icon, **kwargs)
 
     def _get_data(self):
@@ -207,7 +209,7 @@ class MpdWidget(Widget):
 
 
 class BatteryWidget(Widget):
-    def __init__(self, icon='ó', hide_value=80, **kwargs):
+    def __init__(self, icon='ó', hide_value=70, **kwargs):
         self._hide_value = hide_value
         super().__init__(icon=icon, **kwargs)
 
@@ -231,8 +233,6 @@ class WiFiWidget(Widget):
     def __init__(self, icon='¤', adapter='wlp7s0', **kwargs):
         self._adapter = adapter
         super().__init__(icon=icon, **kwargs)
-        self.background = 'dark_green'
-        self.foreground = 'white'
 
     def _get_essid(self):
         data = subprocess.getoutput('iwconfig ' + self._adapter)
