@@ -253,6 +253,9 @@ class WiFiWidget(Widget):
             essid = self._get_essid()
             if essid:
                 text = essid
+            else:
+                text = ''
+                return
 
             data = subprocess.getoutput('ip addr').splitlines()
             interface_data = {}
@@ -270,10 +273,10 @@ class WiFiWidget(Widget):
                     ip = match.group(1)
                     text = '{} {}'.format(text, ip)
                     break
-            self.update(text) # FIXME: That thing with the ip staying around after disconnection
+            self.update(text)
             sleep(5)
 
-#TODO: This
+#TODO: Finish the taskbar widget
 class TaskbarWidget(Widget):
     def __init__(self, icon=None, **kwargs):
         super().__init__(icon=icon, **kwargs)
