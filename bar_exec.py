@@ -1,9 +1,7 @@
 #!/usr/bin/python
 from bar import Bar
 import time
-#from mpd import MPDClient, ConnectionError
-from subprocess import getoutput
-import re
+# from mpd import MPDClient, ConnectionError
 import os
 import widgets
 
@@ -13,7 +11,7 @@ if __name__ == '__main__':
     bar = Bar()
     bar.foreground = 'white'
     bar.height = '20'
-    bar.font = 'ohsnap.icons:size=8'
+    bar.font = ['stlarch:size=8', 'ohsnap.icons:size=8']
     bar.start()
 
     with open(PID_FILE, 'w') as f:
@@ -21,31 +19,27 @@ if __name__ == '__main__':
         f.write('\n')
         f.write(str(bar.get_pid()))
 
-    mpdwidget = widgets.MpdWidget(bar=bar, position='right', icon=None)
+    mpdwidget = widgets.MpdWidget(bar=bar, position='right')
     mpdwidget.background = 'dark_green'
-    # mpdwidget.foreground = 'white'
+    mpdwidget.icon = ''
 
-    wifiwidget = widgets.WiFiWidget(bar=bar, position='right', icon=None)
+    wifiwidget = widgets.WiFiWidget(bar=bar, position='right')
     wifiwidget.background = 'magenta'
-    # ifiwidget.foreground = 'white'
+    wifiwidget.icon = ''
 
-    batterywidget = widgets.BatteryWidget(bar=bar, position='right', icon=None)
+    batterywidget = widgets.BatteryWidget(bar=bar, position='right')
+    batterywidget.icon = ''
+    batterywidget.hide_value = 100
     batterywidget.background = 'blue'
-    # batterywidget.foreground = 'white'
 
-    clockwidget = widgets.ClockWidget(bar=bar, position='right', icon=None)
+    clockwidget = widgets.ClockWidget(bar=bar, position='right')
     clockwidget.background = 'red'
-    # clockwidget.foreground = 'white'
+    clockwidget.icon = ''
 
-    # taskbarwidget = widgets.TaskbarWidget(bar=bar, position='center', icon=None)
-    # titlewidget = widgets.TitleWidget(bar=bar, position='left')
-
-    workspacewidget = widgets.BSPWMWorkspaceWidget(labels=[i for i in '¹rchlinux'],
-            bar=bar, position='left')
+    workspacewidget = widgets.BSPWMWorkspaceWidget(
+        labels=[i for i in '¹rchlinux'],
+        bar=bar, position='left')
     workspacewidget.background = 'dark_blue'
-    # workspacewidget.foreground = 'white'
-
-
 
     while 1:
         time.sleep(30)

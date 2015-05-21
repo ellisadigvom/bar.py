@@ -12,11 +12,11 @@ from os import path
 # TODO: Clean up init methods
 # FIXME: Widgets start to execute as soon as they are created. They shouldn't
 class Widget(threading.Thread):
-    def __init__(self, bar, position='center', icon=None):
+    def __init__(self, bar, position='center'):
         if not bar:
             raise ValueError
         self._bar = bar
-        self._icon = icon
+        self.icon = None
         self.background = 'background'
         self.foreground = 'foreground'
         self.line_color = self.foreground
@@ -34,7 +34,7 @@ class Widget(threading.Thread):
 
     def format_icon(self):
         # Color the icon and whatever at widget init
-        if self._icon:
+        if self.icon:
             pass
 
     def _update_icon(self, icon):
@@ -44,9 +44,8 @@ class Widget(threading.Thread):
         return self._bar.format(text, **kwargs)
 
     def iconify(self):
-        if self._icon:
-            self.text = '{}{}{}'.format(self._icon,
-                self._bar.resources['icon_separator'], self.text)
+        if self.icon:
+            self.text = '{} {}'.format(self.icon, self.text)
 
     def make_clickable(self, text, args, button=''):
         return self._bar.make_clickable(text, args, self, button)
@@ -59,9 +58,9 @@ class Widget(threading.Thread):
 
 
 class SkeletonWidget(Widget):
-    def __init__(self, icon=None, **kwargs):
+    def __init__(self, **kwargs):
         # Do init stuff here
-        super().__init__(icon=icon, **kwargs)
+        super().__init__(**kwargs)
 
     def click_handler(self, args):
         """ Handle click events
@@ -79,18 +78,18 @@ class StaticTextWidget():
 
 
 class ClockWidget(Widget):
-    def __init__(self, format_string='%a %d %b %H:%M', icon='È', **kwargs):
-        self._format_string = format_string
-        super().__init__(icon=icon, **kwargs)
+    def __init__(self, **kwargs):
+        self.format_string = '%a %d %b %H:%M'
+        super().__init__(**kwargs)
 
     def run(self):
         while 1:
-            self.update(strftime(self._format_string))
+            self.update(strftime(self.format_string))
             seconds = int(strftime('%S'))
             sleep(60 - seconds)
 
 
-#TODO: Implement the clicky widget
+# TODO: Implement the clicky widget
 # a.k.a the button widget
 class ClickyWidget(Widget):
     def __init__(self):
@@ -99,13 +98,17 @@ class ClickyWidget(Widget):
 
 class BSPWMWorkspaceWidget(Widget):
     def __init__(self, labels=None, **kwargs):
-        if not labels: labels = []
+        if not labels:
+            labels = []
         self._labels = labels
         super().__init__(**kwargs)
 
     def run(self):
-        bspc_subscribe = subprocess.Popen (['bspc', 'control', '--subscribe'],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        bspc_subscribe = subprocess.Popen(
+            ['bspc', 'control', '--subscribe'],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True)
+
         while 1:
             text = ''
             line = bspc_subscribe.stdout.readline()
@@ -126,8 +129,11 @@ class BSPWMWorkspaceWidget(Widget):
                 if active:
                     workspace_text = self.format(workspace_text, invert=True)
                 if occupied:
-                    workspace_text = self.format(workspace_text, underline=True)
-                workspace_text = self.make_clickable(workspace_text, 'switch-to {}'.format(workspace[1:]) )
+                    workspace_text = self.format(workspace_text,
+                                                 underline=True)
+                workspace_text = self.make_clickable(
+                    workspace_text,
+                    'switch-to {}'.format(workspace[1:]))
                 text += workspace_text
 
             self.update(text)
@@ -136,19 +142,21 @@ class BSPWMWorkspaceWidget(Widget):
         subprocess.call(['bspc', 'desktop', '-f', arguments[1]])
 
 
-#TODO: Bad things happen when mpd is not running
+# FIXME: Bad things happen when mpd is not running
+# TODO: Use a python mpd library
 class MpdWidget(Widget):
-    def __init__(self, icon='ê', host='localhost', port='6600', **kwargs):
+    def __init__(self, host='localhost', port='6600', **kwargs):
         self._host = host
         self._port = port
-        super().__init__(icon=icon, **kwargs)
+        super().__init__(**kwargs)
 
     def _get_data(self):
         title = None
         artist = None
         playing = False
-        mpc_output = subprocess.getoutput('mpc status --format {} -h {} -p {}'.format(
-            '%title%---%artist%---%file%', self._host, self._port))
+        mpc_output = subprocess.getoutput(
+            'mpc status --format {} -h {} -p {}'.format(
+                '%title%---%artist%---%file%', self._host, self._port))
         lines = mpc_output.splitlines()
 
         # Is it stopped?
@@ -214,9 +222,9 @@ class MpdWidget(Widget):
 
 
 class BatteryWidget(Widget):
-    def __init__(self, icon='ó', hide_value=70, **kwargs):
-        self._hide_value = hide_value
-        super().__init__(icon=icon, **kwargs)
+    def __init__(self, **kwargs):
+        self.hide_value = 70
+        super().__init__(**kwargs)
 
     def _get_percentage(self):
         charge_full = int(open('/sys/class/power_supply/BAT0/charge_full').read())
@@ -227,7 +235,7 @@ class BatteryWidget(Widget):
     def run(self):
         while 1:
             percentage = self._get_percentage()
-            if percentage > self._hide_value:
+            if percentage > self.hide_value:
                 self.update(None)
             else:
                 self.update(str(percentage))
@@ -235,9 +243,9 @@ class BatteryWidget(Widget):
 
 
 class WiFiWidget(Widget):
-    def __init__(self, icon='¤', adapter='wlp7s0', **kwargs):
+    def __init__(self, adapter='wlp7s0', **kwargs):
         self._adapter = adapter
-        super().__init__(icon=icon, **kwargs)
+        super().__init__(**kwargs)
 
     def _get_essid(self):
         data = subprocess.getoutput('iwconfig ' + self._adapter)
@@ -255,7 +263,9 @@ class WiFiWidget(Widget):
                 text = essid
             else:
                 text = ''
-                return
+                self.update(text)
+                sleep(5)
+                next
 
             data = subprocess.getoutput('ip addr').splitlines()
             interface_data = {}
@@ -278,8 +288,8 @@ class WiFiWidget(Widget):
 
 #TODO: Finish the taskbar widget
 class TaskbarWidget(Widget):
-    def __init__(self, icon=None, **kwargs):
-        super().__init__(icon=icon, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def click_handler(self, args):
         """ Handle click events
@@ -308,9 +318,9 @@ class TaskbarWidget(Widget):
             sleep(1)
 
 class IPAddrWidget(Widget):
-    def __init__(self, icon=None, interface='wlp2s0', **kwargs):
+    def __init__(self, interface='wlp2s0', **kwargs):
         self._interface = interface
-        super().__init__(icon=icon, **kwargs)
+        super().__init__(**kwargs)
 
     def click_handler(self, args):
         """ Handle click events
@@ -340,9 +350,9 @@ class IPAddrWidget(Widget):
             sleep(10)
 
 class TitleWidget(Widget):
-    def __init__(self, icon=None, **kwargs):
+    def __init__(self, **kwargs):
         # Do init stuff here
-        super().__init__(icon=icon, **kwargs)
+        super().__init__(**kwargs)
 
     def click_handler(self, args):
         """ Handle click events
