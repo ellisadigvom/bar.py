@@ -96,7 +96,6 @@ class Bar():
         self._bar_process.stdin.write('\n')
         self._bar_process.stdin.flush()
 
-    # TODO: Modify this so separators are also colored
     def redraw(self):
         ''' Print widgets to the appropriate positions on the bar
         '''
@@ -110,13 +109,15 @@ class Bar():
             center_string = ''
         else:
             center_string = self.separator.join(
-                [self.draw_widget(i) for i in self._widgets['center'] if i.text])
+                [self.draw_widget(i) for i in
+                    self._widgets['center'] if i.text])
 
         if self._widgets['right'] == []:
             right_string = ''
         else:
             right_string = self.separator.join(
-                [self.draw_widget(i) for i in self._widgets['right'] if i.text])
+                [self.draw_widget(i) for i in
+                    self._widgets['right'] if i.text])
 
         line = ''.join(('%{l}', left_string,
                         '%{c}', center_string,
@@ -155,7 +156,6 @@ class Bar():
         elif len(raw_color) == 6:
             return ''.join(('#', 'ff', raw_color))
 
-    # TODO: The rest of the formatting options
     def format(self, text, background=None, foreground=None, underline=False,
                overline=False, line_color=None, invert=False):
         """ Format text according to the options given using bar's syntax
@@ -184,7 +184,8 @@ class Bar():
 
     def make_clickable(self, text, args, widget, button=''):
         widget_hash = widget.__hash__()
-        text = '%{{A{}:{} {}:}}{}%{{A}}'.format(button, widget_hash, args, text)
+        text = '%{{A{}:{} {}:}}{}%{{A}}' .format(
+            button, widget_hash, args, text)
         return text
 
 

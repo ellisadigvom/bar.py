@@ -11,7 +11,7 @@ if __name__ == '__main__':
     bar = Bar()
     bar.foreground = 'white'
     bar.height = '20'
-    bar.font = ['stlarch:size=8', 'ohsnap.icons:size=8']
+    bar.font = ['siji:size=8', 'ohsnap:size=8']
     bar.start()
 
     with open(PID_FILE, 'w') as f:
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     clockwidget.icon = ''
 
     workspacewidget = widgets.BSPWMWorkspaceWidget(
-        labels=[i for i in '¹rchlinux'],
+        labels=[i for i in 'rchlinux'],
         bar=bar, position='left')
     workspacewidget.background = 'dark_blue'
 
