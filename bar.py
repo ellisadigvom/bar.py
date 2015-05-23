@@ -167,26 +167,30 @@ class Bar():
             i = self.color(i)
 
         if foreground:
-            text = '%{{F{0}}}{1}%{{F-}}'.format(foreground, text)
+            text = wrap('F'+foreground, text, 'F-')
         if background:
-            text = '%{{B{0}}}{1}%{{B-}}'.format(background, text)
+            text = wrap('B'+background, text, 'B-')
         if underline or overline:
             if underline:
-                text = '%{{+u}}{}%{{-u}}'.format(text)
+                text = wrap('+u', text, '-u')
             if overline:
-                text = '%{{+o}}{}%{{-o}}'.format(text)
+                text = wrap('+o', text, '-o')
             if line_color:
-                text = '%{{U{0}}}{1}%{{U-}}'.format(line_color, text)
+                text = wrap('U'+line_color, text, 'U-')
 
         if invert:
-            text = '%{{R}}{}%{{R}}'.format(text)
+            text = wrap('R', text, 'R')
         return text
 
     def make_clickable(self, text, args, widget, button=''):
         widget_hash = widget.__hash__()
-        text = '%{{A{}:{} {}:}}{}%{{A}}' .format(
-            button, widget_hash, args, text)
+        text = wrap('A{}:{} {}:'.format(button, widget_hash, args), text, 'A')
+
         return text
+
+
+def wrap(o, text, c):
+    return '%{{{}}}{}%{{{}}}'.format(o, text, c)
 
 
 def get_xresources():

@@ -21,6 +21,8 @@ class Widget(threading.Thread):
         self.foreground = 'foreground'
         self.line_color = self.foreground
         self.text = ''
+        # TODO: Write methods in Bar to draw progress bars on widgets
+        self.progress_bar = 0
         bar.register(self, position=position)
         self.format_icon()
         super().__init__()
