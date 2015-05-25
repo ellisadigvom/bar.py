@@ -11,12 +11,7 @@ if __name__ == '__main__':
     bar.foreground = 'white'
     bar.height = '20'
     bar.font = ['siji:size=8', 'ohsnap:size=8']
-    bar.start()
 
-    with open(PID_FILE, 'w') as f:
-        f.write(str(os.getpid()))
-        f.write('\n')
-        f.write(str(bar.get_pid()))
 
     # mpdwidget = widgets.MpdWidget()
     # mpdwidget.background = 'dark_green'
@@ -45,5 +40,12 @@ if __name__ == '__main__':
     bar.add(clockwidget, 'r')
     # bar.add(workspacewidget, 'l')
 
-    while 1:
-        time.sleep(30)
+    # while 1:
+    #     time.sleep(30)
+
+    bar.start()
+
+    with open(PID_FILE, 'w') as f:
+        f.write(str(os.getpid()))
+        f.write('\n')
+        f.write(str(bar.get_pid()))

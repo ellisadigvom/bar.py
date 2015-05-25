@@ -52,12 +52,12 @@ class Widget():
         pass
 
 
-class ClockWidget():
+class ClockWidget(Widget):
     def __init__(self):
+        super().__init__()
         self.format_string = '%a %d %b %H:%M'
-        self.firstrun = True
 
-    def run(self):
+    def update(self):
         seconds = int(strftime('%S'))
         self.timer = seconds
         return strftime(self.format_string)

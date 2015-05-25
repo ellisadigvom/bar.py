@@ -3,12 +3,19 @@
 from subprocess import PIPE, Popen, getoutput
 import re
 import threading
+import time
+from types import FunctionType
 # TODO: The rest of the clicky stuff
 
 
 class Bar():
     def __init__(self):
-        self._widgets = {'left': [], 'center': [], 'right': []}
+        # { widget,
+        #   position,
+        #   thread,
+        #   text }
+        # A list of that^ dict
+        self._widgets = []
 
         self.background = 'background'
         self.foreground = 'foreground'
@@ -67,8 +74,22 @@ class Bar():
             raise ValueError(error)
 
         self._bar_process = bar_process
-        self._listen_thread = threading.Thread(target=self.click_listener)
-        self._listen_thread.start()
+        # self._listen_thread = threading.Thread(target=self.click_listener)
+        # self._listen_thread.start()
+
+        for w in self._widgets:
+            w['thread'] = threading.Thread(target=lambda: self._run_widget(w))
+            w['thread'].start()
+
+    def _run_widget(self, w):
+        while 1:
+            w['text'] = w['widget'].update()
+            self.redraw()
+
+            if isinstance(w['widget'].timer, FunctionType):
+                w['widget'].timer()
+            else:
+                time.sleep(w['widget'].timer)
 
     def click_listener(self):
         while 1:
@@ -82,16 +103,19 @@ class Bar():
                     i.click_handler(arguments)
                     break
 
-    def register(self, widget, position):
-        self._widgets[position].append(widget)
-
     def add(self, widget, position):
-        if position.lower in ['left', 'l']:
-            self._widgets['left'].append(widget)
-        if position.lower in ['center', 'c']:
-            self._widgets['center'].append(widget)
-        if position.lower in ['right', 'r']:
-            self._widgets['right'].append(widget)
+        if position.lower() in ['left', 'l']:
+            position = 'left'
+        if position.lower() in ['center', 'c']:
+            position = 'center'
+        if position.lower() in ['right', 'r']:
+            position = 'right'
+
+        self._widgets.append({'widget': widget,
+                              'position': position,
+                              'thread': None,
+                              'text': ''
+                              })
 
     def get_pid(self):
         if self._bar_process:
@@ -107,33 +131,22 @@ class Bar():
     def redraw(self):
         ''' Print widgets to the appropriate positions on the bar
         '''
-        if self._widgets['left'] == []:
-            left_string = ''
-        else:
-            left_string = self.separator.join(
-                [self.draw_widget(i) for i in self._widgets['left'] if i.text])
+        strings = {'left': [],
+                   'center': [],
+                   'right': []}
 
-        if self._widgets['center'] == []:
-            center_string = ''
-        else:
-            center_string = self.separator.join(
-                [self.draw_widget(i) for i in
-                    self._widgets['center'] if i.text])
+        for w in self._widgets:
+            if w['text']:
+                strings[w['position']].append(
+                    self.draw_widget(w['widget'], w['text']))
 
-        if self._widgets['right'] == []:
-            right_string = ''
-        else:
-            right_string = self.separator.join(
-                [self.draw_widget(i) for i in
-                    self._widgets['right'] if i.text])
-
-        line = ''.join(('%{l}', left_string,
-                        '%{c}', center_string,
-                        '%{r}', right_string))
+        line = ''.join(('%{l}', self.separator.join(strings['left']),
+                        '%{c}', self.separator.join(strings['center']),
+                        '%{r}', self.separator.join(strings['right'])))
         self._print_line(line)
 
-    def draw_widget(self, widget):
-        s = "{}{}{}".format(self.padding, widget.text, self.padding)
+    def draw_widget(self, widget, text):
+        s = "{}{}{}".format(self.padding, text, self.padding)
         return self.format(s, widget.background, widget.foreground,
                            line_color=widget.line_color)
 
@@ -191,7 +204,6 @@ class Bar():
     def make_clickable(self, text, args, widget, button=''):
         widget_hash = widget.__hash__()
         text = wrap('A{}:{} {}:'.format(button, widget_hash, args), text, 'A')
-
         return text
 
 
