@@ -85,6 +85,14 @@ class Bar():
     def register(self, widget, position):
         self._widgets[position].append(widget)
 
+    def add(self, widget, position):
+        if position.lower in ['left', 'l']:
+            self._widgets['left'].append(widget)
+        if position.lower in ['center', 'c']:
+            self._widgets['center'].append(widget)
+        if position.lower in ['right', 'r']:
+            self._widgets['right'].append(widget)
+
     def get_pid(self):
         if self._bar_process:
             return self._bar_process.pid
@@ -137,10 +145,9 @@ class Bar():
             return None
 
         if not skip_defaults:
-            if color == 'background':
-                return self.color(self.background, skip_defaults=True)
-            elif color == 'foreground':
-                return self.color(self.foreground, skip_defaults=True)
+            if color in ['background', 'foreground']:
+                return self.color(self.__getattribute__(color),
+                                  skip_defaults=True)
 
         # Check color dictionary
         if color in self._colors:
@@ -149,7 +156,6 @@ class Bar():
         match = re.search('([a-f \d]{6}$)|([a-f \d]{8}$)', color)
         if not match:
             return None
-            # raise ValueError('Invalid color: ' + color)
         raw_color = match.group(0)
         if len(raw_color) == 8:
             return ''.join(('#', raw_color))
