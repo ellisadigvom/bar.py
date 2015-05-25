@@ -11,133 +11,112 @@ from os import path
 
 # TODO: Clean up init methods
 # FIXME: Widgets start to execute as soon as they are created. They shouldn't
-class Widget(threading.Thread):
-    def __init__(self, bar, position='center'):
-        if not bar:
-            raise ValueError
-        self._bar = bar
+class Widget():
+    def __init__(self):
         self.icon = None
         self.background = 'background'
         self.foreground = 'foreground'
+
+        # The color of the underline, if any
         self.line_color = self.foreground
-        self.text = ''
+
         # TODO: Write methods in Bar to draw progress bars on widgets
-        self.progress_bar = 0
-        bar.register(self, position=position)
-        self.format_icon()
-        super().__init__()
-        self.start()
+        # This tells the Bar class to draw a progress bar under the
+        # widget. It is a number from 0 to 1. If it is negative, draw
+        # the bar from the right
+        self.progress = 0
 
-    def update(self, text):
-        self.text = text
-        if text:
-            self.iconify()
-        self._bar.redraw()
+        # If this is a number, the Bar class waits n seconds before calling
+        # update again
+        # If this is a function, the Bar class calls it with no arguments and
+        # waits for it to return before calling update again.
+        # The return value is not used
+        self.timer = 0
 
-    def format_icon(self):
-        # Color the icon and whatever at widget init
-        if self.icon:
-            pass
-
-    def _update_icon(self, icon):
+    def update(self):
+        ''' Return the text to display on the bar
+            This method is called in an infinite loop
+        '''
         pass
 
     def format(self, text, **kwargs):
         return self._bar.format(text, **kwargs)
 
-    def iconify(self):
-        if self.icon:
-            self.text = '{} {}'.format(self.icon, self.text)
-
     def make_clickable(self, text, args, button=''):
         return self._bar.make_clickable(text, args, self, button)
 
-    def click_handler(self, args):
+    # TODO: The whole clicking thing
+    def on_click(self, **kwargs):
         """ Handle click events
         """
         pass
 
 
-class SkeletonWidget(Widget):
-    def __init__(self, **kwargs):
-        # Do init stuff here
-        super().__init__(**kwargs)
-
-    def click_handler(self, args):
-        """ Handle click events
-        """
-        pass
-
-    def run(self):
-        text = 'Stuff you want to display'
-        self.update(text)
-
-
-class StaticTextWidget():
-    def __init__(self, text):
-        self._text = text
-
-
-class ClockWidget(Widget):
-    def __init__(self, **kwargs):
+class ClockWidget():
+    def __init__(self):
         self.format_string = '%a %d %b %H:%M'
-        super().__init__(**kwargs)
+        self.firstrun = True
 
     def run(self):
-        while 1:
-            self.update(strftime(self.format_string))
-            seconds = int(strftime('%S'))
-            sleep(60 - seconds)
+        seconds = int(strftime('%S'))
+        self.timer = seconds
+        return strftime(self.format_string)
 
 
 class BSPWMWorkspaceWidget(Widget):
-    def __init__(self, labels=None, **kwargs):
+    def __init__(self, labels=None):
         if not labels:
             labels = []
         self._labels = labels
-        super().__init__(**kwargs)
 
-    def run(self):
-        bspc_subscribe = subprocess.Popen(
+        self.bspc = subprocess.Popen(
             ['bspc', 'control', '--subscribe'],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             universal_newlines=True)
+        self.bspc_output = None
 
-        while 1:
-            text = ''
-            line = bspc_subscribe.stdout.readline()
-            workspaces = line.split(':')[1:-1]
-            for workspace, label in zip_longest(workspaces, self._labels):
-                active = False
-                occupied = False
+    def wait(self):
+        self.bspc_output = self.bspc.stdout.readline()
 
-                if workspace[0].isupper():
-                    active = True
-                if workspace[0].lower() == 'o':
-                    occupied = True
+    def run(self):
+        if not self.bspc_output:
+            self.bspc_output = subprocess.getoutput('bspc control --subscribe')
 
-                if label:
-                    workspace_text = ' {} '.format(label)
-                else:
-                    workspace_text = ' {} '.format(workspace[1:])
-                if active:
-                    workspace_text = self.format(workspace_text, invert=True)
-                if occupied:
-                    workspace_text = self.format(workspace_text,
-                                                 underline=True)
-                workspace_text = self.make_clickable(
-                    workspace_text,
-                    'switch-to {}'.format(workspace[1:]))
-                text += workspace_text
+        text = ''
+        line = self.bspc.stdout.readline()
+        workspaces = line.split(':')[1:-1]
+        for workspace, label in zip_longest(workspaces, self._labels):
+            active = False
+            occupied = False
 
-            self.update(text)
+            if workspace[0].isupper():
+                active = True
+            if workspace[0].lower() == 'o':
+                occupied = True
 
-    def click_handler(self, arguments):
-        subprocess.call(['bspc', 'desktop', '-f', arguments[1]])
+            if label:
+                workspace_text = ' {} '.format(label)
+            else:
+                workspace_text = ' {} '.format(workspace[1:])
+            if active:
+                workspace_text = self.format(workspace_text, invert=True)
+            if occupied:
+                workspace_text = self.format(workspace_text,
+                                             underline=True)
+            # TODO: Make the workspaces clickable
+            # workspace_text = self.make_clickable(
+            #     workspace_text,
+            #     'switch-to {}'.format(workspace[1:]))
+            text += workspace_text
+        return text
+
+    # def on_click(self, arguments):
+    #     subprocess.call(['bspc', 'desktop', '-f', arguments[1]])
 
 
 # FIXME: Bad things happen when mpd is not running
 # TODO: Use a python mpd library
+# TODO: Rewrite
 class MpdWidget(Widget):
     def __init__(self, host='localhost', port='6600', **kwargs):
         self._host = host
@@ -219,6 +198,7 @@ class MpdWidget(Widget):
                 sleep(2)
 
 
+# TODO: Rewrite
 class BatteryWidget(Widget):
     def __init__(self, **kwargs):
         self.hide_value = 70
@@ -241,6 +221,7 @@ class BatteryWidget(Widget):
             sleep(30)
 
 
+# TODO: Rewrite
 class WiFiWidget(Widget):
     def __init__(self, adapter='wlp7s0', **kwargs):
         self._adapter = adapter
@@ -292,6 +273,7 @@ class WiFiWidget(Widget):
             sleep(5)
 
 
+# TODO: Rewrite
 class IPAddrWidget(Widget):
     def __init__(self, interface='wlp2s0', **kwargs):
         self._interface = interface
@@ -325,6 +307,7 @@ class IPAddrWidget(Widget):
             sleep(10)
 
 
+# TODO: Rewrite
 class TitleWidget(Widget):
     def __init__(self, **kwargs):
         # Do init stuff here
