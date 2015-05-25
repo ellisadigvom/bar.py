@@ -1,7 +1,6 @@
 #!/usr/bin/python
 from bar import Bar
 import time
-# from mpd import MPDClient, ConnectionError
 import os
 import widgets
 
@@ -19,27 +18,32 @@ if __name__ == '__main__':
         f.write('\n')
         f.write(str(bar.get_pid()))
 
-    mpdwidget = widgets.MpdWidget(bar=bar, position='right')
-    mpdwidget.background = 'dark_green'
-    mpdwidget.icon = ''
+    # mpdwidget = widgets.MpdWidget()
+    # mpdwidget.background = 'dark_green'
+    # mpdwidget.icon = ''
 
-    wifiwidget = widgets.WiFiWidget(bar=bar, position='right')
-    wifiwidget.background = 'magenta'
-    wifiwidget.icon = ''
+    # wifiwidget = widgets.WiFiWidget()
+    # wifiwidget.background = 'magenta'
+    # wifiwidget.icon = ''
 
-    batterywidget = widgets.BatteryWidget(bar=bar, position='right')
-    batterywidget.icon = ''
-    batterywidget.hide_value = 100
-    batterywidget.background = 'blue'
+    # batterywidget = widgets.BatteryWidget()
+    # batterywidget.icon = ''
+    # batterywidget.hide_value = 100
+    # batterywidget.background = 'blue'
 
-    clockwidget = widgets.ClockWidget(bar=bar, position='right')
+    clockwidget = widgets.ClockWidget()
     clockwidget.background = 'red'
     clockwidget.icon = ''
 
-    workspacewidget = widgets.BSPWMWorkspaceWidget(
-        labels=[i for i in 'rchlinux'],
-        bar=bar, position='left')
-    workspacewidget.background = 'dark_blue'
+    # workspacewidget = widgets.BSPWMWorkspaceWidget()
+    # workspacewidget.labels = [i for i in 'rchlinux']
+    # workspacewidget.background = 'dark_blue'
+
+    # bar.add(mpdwidget, 'r')
+    # bar.add(wifiwidget, 'r')
+    # bar.add(batterywidget, 'r')
+    bar.add(clockwidget, 'r')
+    # bar.add(workspacewidget, 'l')
 
     while 1:
         time.sleep(30)
