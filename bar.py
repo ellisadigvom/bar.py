@@ -1,11 +1,9 @@
-#!/usr/bin/python
-# Author: Ellis Adigvom ellisadigvom@gmail.com
+# Author: Ellis Adigvom <ellisadigvom@gmail.com>
 from subprocess import PIPE, Popen, getoutput
 import re
 import threading
 import time
-from types import FunctionType
-# TODO: The rest of the clicky stuff
+from types import FunctionType, MethodType
 
 
 class Bar():
@@ -31,7 +29,7 @@ class Bar():
         self.font = None
         self.position = 'top'
 
-        self._colors = {}
+        self._colors = {}  # self.color checks this dict
         self._colors = {k: self.color(v) for (k, v)
                         in get_xresources().items()}
 
@@ -83,10 +81,12 @@ class Bar():
 
     def _run_widget(self, w):
         while 1:
+            # print(w['widget'].__class__())
             w['text'] = w['widget'].update()
             self.redraw()
 
-            if isinstance(w['widget'].timer, FunctionType):
+            if isinstance(w['widget'].timer, FunctionType) or \
+               isinstance(w['widget'].timer, MethodType):
                 w['widget'].timer()
             else:
                 time.sleep(w['widget'].timer)
@@ -110,6 +110,8 @@ class Bar():
             position = 'center'
         if position.lower() in ['right', 'r']:
             position = 'right'
+
+        widget._bar = self
 
         self._widgets.append({'widget': widget,
                               'position': position,
@@ -146,9 +148,23 @@ class Bar():
         self._print_line(line)
 
     def draw_widget(self, widget, text):
-        s = "{}{}{}".format(self.padding, text, self.padding)
-        return self.format(s, widget.background, widget.foreground,
+        # TODO: Draw the icon
+        # TODO: Draw the progress bar
+        if not text:
+            return None
+
+        # Add the icon
+        if widget.icon:
+            text = "{}{}{}".format(widget.icon, self.icon_separator, text)
+
+        # Add the padding
+        text = "{}{}{}".format(self.padding, text, self.padding)
+
+        # Format the text
+        text = self.format(text, widget.background, widget.foreground,
                            line_color=widget.line_color)
+
+        return text
 
     def color(self, color, skip_defaults=False):
         ''' Takes anything that looks like it might be a color

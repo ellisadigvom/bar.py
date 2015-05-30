@@ -1,21 +1,26 @@
-# coding: utf-8
-
+# Author: Ellis Adigvom <ellisadigvom@gmail.com>
 from time import strftime, sleep
 import subprocess
 import re
 from itertools import zip_longest
-import threading
 import shlex
 from os import path
 
 
-# TODO: Clean up init methods
-# FIXME: Widgets start to execute as soon as they are created. They shouldn't
 class Widget():
     def __init__(self):
-        self.icon = None
+        # Entirely self explanatory
         self.background = 'background'
         self.foreground = 'foreground'
+
+        # The icons are regular strings like 'a', 'b' and ''
+        # I recommend the siji icon font
+        self.icon = None
+
+        # A list of executables that should be found in the PATH for the
+        # widget to function
+        self.executable_deps = []
+        self._check_deps()
 
         # The color of the underline, if any
         self.line_color = self.foreground
@@ -32,6 +37,11 @@ class Widget():
         # waits for it to return before calling update again.
         # The return value is not used
         self.timer = 0
+
+    def _check_deps(self):
+        ''' Check for dependencies, and raise an exception if they're not found
+        '''
+        pass
 
     def update(self):
         ''' Return the text to display on the bar
@@ -56,18 +66,23 @@ class ClockWidget(Widget):
     def __init__(self):
         super().__init__()
         self.format_string = '%a %d %b %H:%M'
+        self.first_run = True
 
     def update(self):
-        seconds = int(strftime('%S'))
-        self.timer = seconds
+        if self.first_run:
+            seconds = int(strftime('%S'))
+            self.timer = seconds + 1
+        else:
+            self.timer = 60
         return strftime(self.format_string)
 
 
 class BSPWMWorkspaceWidget(Widget):
-    def __init__(self, labels=None):
-        if not labels:
-            labels = []
-        self._labels = labels
+    def __init__(self):
+        super().__init__()
+        self.executable_deps = ['bspc']
+
+        self.labels = []
 
         self.bspc = subprocess.Popen(
             ['bspc', 'control', '--subscribe'],
@@ -75,17 +90,18 @@ class BSPWMWorkspaceWidget(Widget):
             universal_newlines=True)
         self.bspc_output = None
 
-    def wait(self):
+    def timer(self):
         self.bspc_output = self.bspc.stdout.readline()
 
-    def run(self):
+    def update(self):
         if not self.bspc_output:
-            self.bspc_output = subprocess.getoutput('bspc control --subscribe')
+            self.bspc_output = subprocess.getoutput(
+                'bspc control --get-status')
 
         text = ''
         line = self.bspc.stdout.readline()
         workspaces = line.split(':')[1:-1]
-        for workspace, label in zip_longest(workspaces, self._labels):
+        for workspace, label in zip_longest(workspaces, self.labels):
             active = False
             occupied = False
 
@@ -114,14 +130,13 @@ class BSPWMWorkspaceWidget(Widget):
     #     subprocess.call(['bspc', 'desktop', '-f', arguments[1]])
 
 
-# FIXME: Bad things happen when mpd is not running
-# TODO: Use a python mpd library
-# TODO: Rewrite
 class MpdWidget(Widget):
     def __init__(self, host='localhost', port='6600', **kwargs):
+        super().__init__()
         self._host = host
         self._port = port
-        super().__init__(**kwargs)
+        self.time_to_next_update = 0
+        self.timer = self._timer
 
     def _get_data(self):
         title = None
@@ -136,7 +151,8 @@ class MpdWidget(Widget):
         if len(lines) == 1:
             return {'title': '', 'artist': '', 'playing': False, 'pos': 0}
 
-        # Title and artist
+        # Title and artist and filename
+        # oh my
         match = re.match('^(.*)---(.*)---(.*)$', lines[0])
         if match:
             title = match.group(1)
@@ -160,50 +176,53 @@ class MpdWidget(Widget):
         return {'title': title, 'artist': artist, 'playing': playing,
                 'position': position, 'length': length, 'filename': filename}
 
-    def run(self):
-        while 1:
-            # Dirty fix for when mpd is not running
+    def _timer(self):
+            process = subprocess.Popen(
+                shlex.split('mpc -h {} -p {} idle player'
+                            .format(self._host, self._port)),
+                stdout=subprocess.PIPE  # So we don't keep printing 'player'
+            )
             try:
-                time_to_next_update = None
-                data = self._get_data()
-                if data['playing']:
-                    if not (data['title']):
-                        text = '{}'.format(
-                            '.'.join(path.basename(
-                                data['filename']).split('.')[:-1]))
-                    else:
-                        text = '{} - {}'.format(data['title'], data['artist'])
+                process.wait(self.time_to_next_update)
+            except subprocess.TimeoutExpired:
+                process.kill()
 
-                    # Drawing the underline progress bar
-                    text_length = len(text)
-                    position = int(text_length *
-                                   (data['position'] / data['length']))
-                    text = self.format(text[:position], underline=True) \
-                        + text[position:]
+    def update(self):
+        try:
+            data = self._get_data()
 
-                    time_to_next_update = float(data['length'] / text_length)
-                    self.update(text)
+            if data['playing']:
+                if not (data['title']):
+                    text = '{}'.format(
+                        '.'.join(path.basename(
+                            data['filename']).split('.')[:-1]))
                 else:
-                    self.update(None)
+                    text = '{} - {}'.format(data['title'], data['artist'])
 
-                process = subprocess.Popen(
-                    shlex.split('mpc -h {} -p {} idle player'
-                                .format(self._host, self._port)))
-                try:
-                    process.wait(time_to_next_update)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-            except:
-                # Bite me
-                sleep(2)
+                # Drawing the underline progress bar
+                text_length = len(text)
+                self.progress = int(text_length *
+                                    (data['position'] / data['length']))
+
+                self.time_to_next_update = data['length'] / text_length
+                return text
+            else:
+                self.time_to_next_update = 500
+                return ''
+
+        except:
+            # Dirty fix for when mpd is not running
+            # Bite me
+            self.time_to_next_update = 2
+            return ''
 
 
-# TODO: Rewrite
 class BatteryWidget(Widget):
-    def __init__(self, **kwargs):
+    def __init__(self):
+        super().__init__()
         self.hide_value = 70
         self.bat_dir = '/sys/class/power_supply/BAT0/'
-        super().__init__(**kwargs)
+        self.timer = 60
 
     def _get_percentage(self):
         charge_full = int(open(self.bat_dir + 'charge_full').read())
@@ -211,29 +230,30 @@ class BatteryWidget(Widget):
         charge_percentage = (charge_now / charge_full) * 100
         return int(charge_percentage)
 
-    def run(self):
-        while 1:
-            percentage = self._get_percentage()
-            if percentage > self.hide_value:
-                self.update(None)
-            else:
-                self.update(str(percentage))
-            sleep(30)
+    def update(self):
+        percentage = self._get_percentage()
+        if percentage > self.hide_value:
+            return ''
+        else:
+            return str(percentage)
 
 
-# TODO: Rewrite
 class WiFiWidget(Widget):
-    def __init__(self, adapter='wlp7s0', **kwargs):
-        self._adapter = adapter
-        self.ip = False
-        super().__init__(**kwargs)
+    def __init__(self):
+        super().__init__()
+        self._adapter = 'wlp7s0'
+        self.show_ip = False
+        self.timer = 5
 
     def _get_essid(self):
-        data = subprocess.getoutput('iwconfig ' + self._adapter)
-        match = re.search('ESSID:"(.*)"', data)
-        if match:
-            return match.group(1).strip()
-        else:
+        try:
+            data = subprocess.getoutput('iwconfig ' + self._adapter)
+            match = re.search('ESSID:"(.*)"', data)
+            if match:
+                return match.group(1).strip()
+            else:
+                return None
+        except:
             return None
 
     def _get_ip(self):
@@ -253,74 +273,15 @@ class WiFiWidget(Widget):
                 ip = match.group(1)
                 return ip
 
-    def run(self):
-        while 1:
-            text = ''
-            essid = self._get_essid()
-            if essid:
-                text = essid
-            else:
-                text = ''
-                self.update(text)
-                sleep(5)
-                next
+    def update(self):
+        essid = self._get_essid()
+        if essid:
+            text = essid
+        else:
+            return ''
 
-            if self.ip:
-                ip = self._get_ip()
-                text = '{} {}'.format(text, ip)
+        if self.show_ip:
+            ip = self._get_ip()
+            text = '{} {}'.format(text, ip)
 
-            self.update(text)
-            sleep(5)
-
-
-# TODO: Rewrite
-class IPAddrWidget(Widget):
-    def __init__(self, interface='wlp2s0', **kwargs):
-        self._interface = interface
-        super().__init__(**kwargs)
-
-    def click_handler(self, args):
-        """ Handle click events
-        """
-        pass
-
-    def run(self):
-        while 1:
-            data = subprocess.getoutput('ip addr').splitlines()
-            interface_data = {}
-            current_interface = ''
-            for line in data:
-                match = re.match('\d: (.+):', line)
-                if match:
-                    current_interface = match.group(1)
-                    interface_data[current_interface] = [line]
-                else:
-                    interface_data[current_interface].append(line)
-            for line in interface_data[self._interface]:
-                match = re.match('\s+inet (\d+\.\d+.\d+.\d+)', line)
-                if match:
-                    ip = match.group(1)
-                    self.update(ip)
-                    break
-                else:
-                    self.update('')
-            sleep(10)
-
-
-# TODO: Rewrite
-class TitleWidget(Widget):
-    def __init__(self, **kwargs):
-        # Do init stuff here
-        super().__init__(**kwargs)
-
-    def click_handler(self, args):
-        """ Handle click events
-        """
-        pass
-
-    def run(self):
-        xtitle = subprocess.Popen(['xtitle', '-s'],
-                                  stdout=subprocess.PIPE,
-                                  universal_newlines=True)
-        while 1:
-            self.update(xtitle.stdout.readline().strip())
+        return text

@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# Author: Ellis Adigvom <ellisadigvom@gmail.com>
 from bar import Bar
 import time
 import os
@@ -12,36 +13,32 @@ if __name__ == '__main__':
     bar.height = '20'
     bar.font = ['siji:size=8', 'ohsnap:size=8']
 
+    mpdwidget = widgets.MpdWidget()
+    mpdwidget.background = 'dark_green'
+    mpdwidget.icon = ''
 
-    # mpdwidget = widgets.MpdWidget()
-    # mpdwidget.background = 'dark_green'
-    # mpdwidget.icon = ''
+    wifiwidget = widgets.WiFiWidget()
+    wifiwidget.background = 'magenta'
+    wifiwidget.icon = ''
 
-    # wifiwidget = widgets.WiFiWidget()
-    # wifiwidget.background = 'magenta'
-    # wifiwidget.icon = ''
-
-    # batterywidget = widgets.BatteryWidget()
-    # batterywidget.icon = ''
-    # batterywidget.hide_value = 100
-    # batterywidget.background = 'blue'
+    batterywidget = widgets.BatteryWidget()
+    batterywidget.icon = ''
+    batterywidget.hide_value = 80
+    batterywidget.background = 'blue'
 
     clockwidget = widgets.ClockWidget()
     clockwidget.background = 'red'
     clockwidget.icon = ''
 
-    # workspacewidget = widgets.BSPWMWorkspaceWidget()
-    # workspacewidget.labels = [i for i in 'rchlinux']
-    # workspacewidget.background = 'dark_blue'
+    workspacewidget = widgets.BSPWMWorkspaceWidget()
+    workspacewidget.labels = [i for i in 'rchlinux']
+    workspacewidget.background = 'dark_blue'
 
-    # bar.add(mpdwidget, 'r')
-    # bar.add(wifiwidget, 'r')
-    # bar.add(batterywidget, 'r')
+    bar.add(mpdwidget, 'r')
+    bar.add(wifiwidget, 'r')
+    bar.add(batterywidget, 'r')
     bar.add(clockwidget, 'r')
-    # bar.add(workspacewidget, 'l')
-
-    # while 1:
-    #     time.sleep(30)
+    bar.add(workspacewidget, 'l')
 
     bar.start()
 
@@ -49,3 +46,6 @@ if __name__ == '__main__':
         f.write(str(os.getpid()))
         f.write('\n')
         f.write(str(bar.get_pid()))
+
+    while 1:
+        time.sleep(30)
