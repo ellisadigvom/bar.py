@@ -72,8 +72,8 @@ class Bar():
             raise ValueError(error)
 
         self._bar_process = bar_process
-        # self._listen_thread = threading.Thread(target=self.click_listener)
-        # self._listen_thread.start()
+        self._listen_thread = threading.Thread(target=self._click_listener)
+        self._listen_thread.start()
 
         for w in self._widgets:
             w['thread'] = threading.Thread(target=lambda: self._run_widget(w))
@@ -91,17 +91,13 @@ class Bar():
             else:
                 time.sleep(w['widget'].timer)
 
-    def click_listener(self):
+    def _click_listener(self):
         while 1:
             line = self._bar_process.stdout.readline().strip()
-            prefix = line.split()[0]
-            arguments = line.split()[1:]
-            widgets = []
-            [widgets.extend(i) for i in self._widgets.values()]
-            for i in widgets:
-                if int(prefix) == i.__hash__():
-                    i.click_handler(arguments)
-                    break
+            index = int(line.split()[0])
+            cmd = ' '.join(line.split()[1:])
+
+            self._widgets[index]['widget'].click_handler(cmd)
 
     def add(self, widget, position):
         if position.lower() in ['left', 'l']:
@@ -118,6 +114,7 @@ class Bar():
                               'thread': None,
                               'text': ''
                               })
+        widget._index = len(self._widgets) - 1
 
     def get_pid(self):
         if self._bar_process:
@@ -155,7 +152,9 @@ class Bar():
 
         # Add the icon
         if widget.icon:
-            text = "{}{}{}".format(widget.icon, self.icon_separator, text)
+            i = self.format(widget.icon, widget.icon_background,
+                            widget.icon_foreground)
+            text = "{}{}{}".format(i, self.icon_separator, text)
 
         # Add the padding
         text = "{}{}{}".format(self.padding, text, self.padding)
@@ -217,10 +216,12 @@ class Bar():
             text = wrap('R', text, 'R')
         return text
 
-    def make_clickable(self, text, args, widget, button=''):
-        widget_hash = widget.__hash__()
-        text = wrap('A{}:{} {}:'.format(button, widget_hash, args), text, 'A')
-        return text
+    def make_clickable(self, text, cmd, index, button=''):
+        return click_wrap(text, index, cmd, button)
+
+
+def click_wrap(text, widget_num, cmd, button=''):
+    return wrap('A{}:{} {}:'.format(button, widget_num, cmd), text, 'A')
 
 
 def wrap(o, text, c):

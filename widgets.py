@@ -16,6 +16,8 @@ class Widget():
         # The icons are regular strings like 'a', 'b' and ''
         # I recommend the siji icon font
         self.icon = None
+        self.icon_foreground = None
+        self.icon_background = None
 
         # A list of executables that should be found in the PATH for the
         # widget to function
@@ -52,11 +54,10 @@ class Widget():
     def format(self, text, **kwargs):
         return self._bar.format(text, **kwargs)
 
-    def make_clickable(self, text, args, button=''):
-        return self._bar.make_clickable(text, args, self, button)
+    def make_clickable(self, text, cmd, button=''):
+        return self._bar.make_clickable(text, cmd, self._index, button)
 
-    # TODO: The whole clicking thing
-    def on_click(self, **kwargs):
+    def click_handler(self, cmd):
         """ Handle click events
         """
         pass
@@ -120,14 +121,14 @@ class BSPWMWorkspaceWidget(Widget):
                 workspace_text = self.format(workspace_text,
                                              underline=True)
             # TODO: Make the workspaces clickable
-            # workspace_text = self.make_clickable(
-            #     workspace_text,
-            #     'switch-to {}'.format(workspace[1:]))
+            workspace_text = self.make_clickable(
+                workspace_text,
+                workspace[1:])
             text += workspace_text
         return text
 
-    # def on_click(self, arguments):
-    #     subprocess.call(['bspc', 'desktop', '-f', arguments[1]])
+    def click_handler(self, cmd):
+        subprocess.call(['bspc', 'desktop', '-f', cmd])
 
 
 class MpdWidget(Widget):
