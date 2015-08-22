@@ -49,11 +49,10 @@ class Bar():
             args.append(foreground)
 
         if self.font:
-            args.append('-f')
             if type(self.font) == list:
-                args.append(','.join(self.font))
+                [args.extend(['-f', f]) for f in self.font]
             else:
-                args.append(self.font)
+                args.extend(['-f', self.font])
 
         if self.position == 'bottom':
             args.append('-b')
