@@ -144,7 +144,6 @@ class Bar():
         self._print_line(line)
 
     def draw_widget(self, widget, text):
-        # TODO: Draw the icon
         # TODO: Draw the progress bar
         if not text:
             return None

@@ -9,16 +9,17 @@ PID_FILE = '/home/ellis/.bar_pid'
 
 if __name__ == '__main__':
     bar = Bar()
-    bar.foreground = 'white'
-    bar.height = '20'
+    bar.foreground = 'black'
+    bar.height = '25'
     bar.font = ['siji:size=8', 'ohsnap:size=8']
+    bar.padding = '  '
 
     mpdwidget = widgets.MpdWidget()
     mpdwidget.background = 'dark_green'
     mpdwidget.icon = ''
 
     wifiwidget = widgets.WiFiWidget()
-    wifiwidget.background = 'magenta'
+    wifiwidget.background = 'dark_blue'
     wifiwidget.icon = ''
 
     batterywidget = widgets.BatteryWidget()

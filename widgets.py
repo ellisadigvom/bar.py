@@ -5,6 +5,8 @@ import re
 from itertools import zip_longest
 import shlex
 from os import path
+import requests
+from requests.adapters import HTTPAdapter
 
 
 class Widget():
@@ -43,6 +45,7 @@ class Widget():
     def _check_deps(self):
         ''' Check for dependencies, and raise an exception if they're not found
         '''
+        # TODO:
         pass
 
     def update(self):
@@ -76,7 +79,6 @@ class ClockWidget(Widget):
         else:
             self.timer = 60
         return strftime(self.format_string)
-
 
 class BSPWMWorkspaceWidget(Widget):
     def __init__(self):
@@ -119,7 +121,8 @@ class BSPWMWorkspaceWidget(Widget):
                 workspace_text = self.format(workspace_text, invert=True)
             if occupied:
                 workspace_text = self.format(workspace_text,
-                                             underline=True)
+                                             underline=True,
+                                             line_color=self.line_color)
             # TODO: Make the workspaces clickable
             workspace_text = self.make_clickable(
                 workspace_text,
@@ -217,7 +220,6 @@ class MpdWidget(Widget):
             self.time_to_next_update = 2
             return ''
 
-
 class BatteryWidget(Widget):
     def __init__(self):
         super().__init__()
@@ -244,6 +246,8 @@ class WiFiWidget(Widget):
         super().__init__()
         self._adapter = 'wlp7s0'
         self.show_ip = False
+        self.normal_icon = ''
+        self.no_internet_icon = ''
         self.timer = 5
 
     def _get_essid(self):
@@ -274,6 +278,17 @@ class WiFiWidget(Widget):
                 ip = match.group(1)
                 return ip
 
+    def _internetp(self):
+        s = requests.Session()
+        s.mount('http://google.com', HTTPAdapter(max_retries=1))
+        try:
+            r = s.head('http://google.com', timeout=5)
+        except:
+            return False
+        if r.status_code in (200, 302):
+            return True
+        return False
+
     def update(self):
         essid = self._get_essid()
         if essid:
@@ -284,6 +299,11 @@ class WiFiWidget(Widget):
         if self.show_ip:
             ip = self._get_ip()
             text = '{} {}'.format(text, ip)
+
+        # if self._internetp():
+        #     self.icon = self.normal_icon
+        # else:
+        #     self.icon = self.no_internet_icon
 
         return text
 
