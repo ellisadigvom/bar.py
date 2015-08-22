@@ -34,9 +34,14 @@ if __name__ == '__main__':
     workspacewidget.labels = [i for i in 'rchlinux']
     workspacewidget.background = 'dark_blue'
 
+    mailwidget = widgets.MailWidget()
+    mailwidget.background = 'dark_red'
+    mailwidget.icon = ''
+
     bar.add(mpdwidget, 'r')
     bar.add(wifiwidget, 'r')
     bar.add(batterywidget, 'r')
+    bar.add(mailwidget, 'r')
     bar.add(clockwidget, 'r')
     bar.add(workspacewidget, 'l')
 

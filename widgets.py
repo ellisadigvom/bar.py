@@ -286,3 +286,23 @@ class WiFiWidget(Widget):
             text = '{} {}'.format(text, ip)
 
         return text
+
+class MailWidget(Widget):
+    def __init__(self):
+        super().__init__()
+        self.timer = 10
+
+    def update(self):
+        count = int(subprocess.getoutput("unread"))
+        running = True
+        try:
+            subprocess.check_call(["pgrep", "offlineimap"])
+        except CalledProcessError:
+            running = False
+
+        if running and not count:
+            return ""
+        elif not running and not count:
+            return "x"
+        else:
+            return count
