@@ -315,14 +315,20 @@ class MailWidget(Widget):
     def update(self):
         count = int(subprocess.getoutput("unread"))
         running = True
+
         try:
-            subprocess.check_call(["pgrep", "offlineimap"])
-        except CalledProcessError:
+            subprocess.check_call(["pgrep", "offlineimap"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError:
             running = False
 
-        if running and not count:
-            return ""
-        elif not running and not count:
-            return "x"
+        if not running:
+            s = "!"
+            if count:
+                s = s + " " + str(count)
+            return s
         else:
-            return count
+            if count:
+                return str(count)
+            return ""
